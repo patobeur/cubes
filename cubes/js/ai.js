@@ -349,19 +349,36 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			break;
 
 		case "escort_gatherer":
+			const gatherer = a.target;
 			if (
-				a.target &&
-				a.target.hp > 0 &&
-				(a.target.state === "seek_resource" ||
-					a.target.state === "return_with_resource")
+				gatherer &&
+				gatherer.hp > 0 &&
+				(gatherer.state === "seek_resource" ||
+					gatherer.state === "return_with_resource")
 			) {
-				const dist = a.mesh.position.distanceTo(a.target.mesh.position);
-				// Keep a safe distance, don't just sit on top of the gatherer
-				if (dist > roleInfo.distances.vue * 0.5) {
-					steerSeek(a, a.target.mesh.position, dt);
-				} else {
-					setVelocity(a.body, 0, 0, 0); // Stop moving if close enough
+				let ultimateTargetPos;
+				// Determine gatherer's ultimate destination
+				if (gatherer.state === "seek_resource" && gatherer.targetResource) {
+					ultimateTargetPos = gatherer.targetResource.pos;
+				} else if (gatherer.state === "return_with_resource") {
+					const gathererHouse = HOUSES.find((h) => h.id === gatherer.faction);
+					if (gathererHouse) {
+						ultimateTargetPos = gathererHouse.mesh.position;
+					}
 				}
+
+				// Default to gatherer's position if no ultimate target is found
+				let finalTarget = ultimateTargetPos || gatherer.mesh.position;
+				const distToGatherer = a.mesh.position.distanceTo(gatherer.mesh.position);
+
+				// If escort strays too far, prioritize regrouping with the gatherer
+				if (distToGatherer > roleInfo.distances.vue) {
+					finalTarget = gatherer.mesh.position;
+				}
+
+				// Move towards the final target
+				steerSeek(a, finalTarget, dt);
+
 			} else {
 				// Gatherer is safe, done with its task, or dead
 				a.state = "wander";
