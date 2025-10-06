@@ -176,19 +176,19 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 		if (closestEnemy && enemyDist < GATHERER_FLEE_DISTANCE) {
 			a.state = "flee";
 		}
-		// Priority 2: Regroup if isolated
-		else if (isIsolated && a.state !== "return_with_resource") {
-			a.state = "return_for_regroup";
-		}
-		// Priority 3: Return resource if carrying one
+		// Priority 2: Return resource if carrying one
 		else if (a.hasResource) {
 			a.state = "return_with_resource";
 		}
-		// Priority 4: Seek resource if available
+		// Priority 3: Seek resource if available
 		else if (resources.length > 0) {
 			a.state = "seek_resource";
 		}
-		// Priority 5: Wander if nothing else to do
+		// Priority 4: Regroup if isolated and has nothing else to do
+		else if (isIsolated) {
+			a.state = "return_for_regroup";
+		}
+		// Priority 5: Wander if not isolated and nothing else to do
 		else {
 			a.state = "wander";
 		}
