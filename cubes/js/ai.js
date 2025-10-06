@@ -164,7 +164,10 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 	if (a.role === "ramasseur") {
 		const [closestEnemy, enemyDist] = findClosestEnemy(a, agents);
 		const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
-		const isIsolated = !closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction;
+		const isIsolated =
+			!closestAlly ||
+			allyDist >
+				roleInfo.distances.max_distance_entre_membre_de_meme_faction;
 
 		// Priority 1: Flee from enemies
 		if (closestEnemy && enemyDist < GATHERER_FLEE_DISTANCE) {
@@ -190,7 +193,10 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 		// Non-gatherers protect their faction's gatherer.
 		const gatherer = findFactionGatherer(a, agents);
 		if (gatherer) {
-			if (a.mesh.position.distanceTo(gatherer.mesh.position) > roleInfo.distances.vue) {
+			if (
+				a.mesh.position.distanceTo(gatherer.mesh.position) >
+				roleInfo.distances.vue
+			) {
 				a.state = "follow_gatherer";
 				a.target = gatherer;
 			} else {
@@ -199,7 +205,11 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 		} else {
 			// No gatherer, fall back to general cohesion.
 			const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
-			if (!closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction) {
+			if (
+				!closestAlly ||
+				allyDist >
+					roleInfo.distances.max_distance_entre_membre_de_meme_faction
+			) {
 				a.state = "return_for_regroup";
 			} else {
 				a.state = "wander";
@@ -244,7 +254,11 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			if (house) {
 				steerSeek(a, house.mesh.position, dt);
 				const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
-				if (!closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction) {
+				if (
+					!closestAlly ||
+					allyDist >
+						roleInfo.distances.max_distance_entre_membre_de_meme_faction
+				) {
 					if (a.mesh.position.distanceTo(house.mesh.position) < 10) {
 						a.state = "wander";
 					}
@@ -277,7 +291,10 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 		case "follow_gatherer":
 			if (a.target && a.target.hp > 0) {
 				steerSeek(a, a.target.mesh.position, dt);
-				if (a.mesh.position.distanceTo(a.target.mesh.position) < roleInfo.distances.vue * 0.8) {
+				if (
+					a.mesh.position.distanceTo(a.target.mesh.position) <
+					roleInfo.distances.vue * 0.8
+				) {
 					a.state = "wander";
 					a.target = null;
 				}
