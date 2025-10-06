@@ -53,6 +53,15 @@ export const SKILLS = {
 		energie: 20,
 		rechargement: 5,
 	},
+	boost: {
+		lv: 1,
+		distance: 0,
+		effet: { bonus: { speed: +0.5 } },
+		rayon: 0,
+		duree: 3,
+		energie: 20,
+		rechargement: 5,
+	},
 };
 
 // Rôles
@@ -127,7 +136,9 @@ export const RES_COLOR = 0xff3b30;
 export const RES_R = 0.2;
 export const RES_PICK = 0.7;
 export const RES_HEAL = 20;
-export const INITIAL_RESOURCES = 12;
+export const INITIAL_RESOURCES = 32;
+export const RESOURCE_SPAWN_RADIUS = 50;
+export const GATHERER_FLEE_DISTANCE = 10;
 
 // Constantes du monde
 export const PLANE_SIZE = 400;
