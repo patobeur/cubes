@@ -53,6 +53,15 @@ export const SKILLS = {
 		energie: 20,
 		rechargement: 5,
 	},
+	boost: {
+		lv: 1,
+		distance: 0,
+		effet: { bonus: { speed: +5 } },
+		rayon: 0,
+		duree: 3,
+		energie: 20,
+		rechargement: 5,
+	},
 };
 
 // Rôles

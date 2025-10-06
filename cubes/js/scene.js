@@ -59,10 +59,10 @@ export function initScene() {
     ui.className = "ui";
     ui.innerHTML = `
         <b>Three.js + Ammo.js</b><br>
-        4 factions (max 3 unités chacune)<br> • Rôles : <b>cube</b>=tank, <b>pyramide</b>=dps, <b>sphère</b>=healer<br>
+        4 factions (max 4 unités chacune)<br> • Rôles : <b>cube</b>=tank, <b>pyramide</b>=dps, <b>sphère</b>=healer, <b>palette</b>=ramasseur<br>
         - Les corps <b>physiques sont tous des cubes</b>; un <b>chapeau</b> au-dessus indique le rôle<br>
-        - Les agents <b>wandern</b> puis <b>cherchent une ressource</b> si HP < 50 (HP init 66, Énergie 99)<br>
-        - <b>12 ressources</b> au sol (pas de repop)<br>
+        - Les agents IA ont des comportements variés selon les situations<br>
+        - Les ressources réapparaissent au centre<br>
         <div id="lockBadge">Lock: OFF</div>
     `;
     document.body.appendChild(ui);

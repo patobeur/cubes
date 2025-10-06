@@ -107,6 +107,15 @@ function nearestResource(pos, resources) {
 	return [best, bd];
 }
 
+function findFactionGatherer(agent, allAgents) {
+	for (const other of allAgents) {
+		if (other.faction === agent.faction && other.role === "ramasseur") {
+			return other;
+		}
+	}
+	return null;
+}
+
 function findClosestFactionMember(agent, allAgents) {
 	let closestDist = Infinity;
 	let closestMember = null;
@@ -128,41 +137,49 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 	a.hp -= 0.5 * dt;
 	if (a.hp < 0) a.hp = 0;
 
-	// --- Determine Agent State ---
 	const roleInfo = ROLES[a.role];
-	const maxDist = roleInfo.distances.max_distance_entre_membre_de_meme_faction;
-	const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
-	const isIsolated = !closestAlly || allyDist > maxDist;
+	const house = HOUSES.find((h) => h.id === a.faction);
 
-	// State transition logic (higher numbers are higher priority)
-	// 1. (Safety) Regroup if isolated, unless already returning with resource
-	if (isIsolated && a.state !== "return_with_resource") {
-		a.state = "return_for_regroup";
-	}
-	// 2. (Objective) Return resource if gatherer has one
-	else if (a.role === "ramasseur" && a.hasResource) {
-		a.state = "return_with_resource";
-	}
-	// 3. (Needs) Seek resource if gatherer is low on HP
-	else if (
-		a.role === "ramasseur" &&
-		a.hp < 50 &&
-		resources.length > 0 &&
-		a.state !== "return_for_regroup" // Don't seek if regrouping
-	) {
-		a.state = "seek_resource";
-	}
-	// 4. (Default) Wander if not doing anything else important
-	else if (
-		a.state !== "seek_resource" &&
-		a.state !== "return_for_regroup"
-	) {
-		a.state = "wander";
+	// --- Determine Agent State ---
+	if (a.role === "ramasseur") {
+		const maxDist = roleInfo.distances.max_distance_entre_membre_de_meme_faction;
+		const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
+		const isIsolated = !closestAlly || allyDist > maxDist;
+
+		if (isIsolated && a.state !== "return_with_resource") {
+			a.state = "return_for_regroup";
+		} else if (a.hasResource) {
+			a.state = "return_with_resource";
+		} else if (a.hp < 50 && resources.length > 0) {
+			a.state = "seek_resource";
+		} else if (a.state !== "return_for_regroup") {
+			a.state = "wander";
+		}
+	} else {
+		// Non-gatherers protect their faction's gatherer.
+		const gatherer = findFactionGatherer(a, agents);
+		if (gatherer) {
+			const distToGatherer = a.mesh.position.distanceTo(gatherer.mesh.position);
+			if (distToGatherer > roleInfo.distances.vue) {
+				a.state = "follow_gatherer";
+				a.target = gatherer;
+			} else {
+				a.state = "wander";
+			}
+		} else {
+			// No gatherer, fall back to general cohesion.
+			const maxDist = roleInfo.distances.max_distance_entre_membre_de_meme_faction;
+			const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
+			const isIsolated = !closestAlly || allyDist > maxDist;
+			if (isIsolated) {
+				a.state = "return_for_regroup";
+			} else {
+				a.state = "wander";
+			}
+		}
 	}
 
 	// --- Execute Behavior based on State ---
-	const house = HOUSES.find((h) => h.id === a.faction);
-
 	switch (a.state) {
 		case "wander":
 			steerWander(a, dt);
@@ -175,38 +192,49 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 				if (d < RES_PICK) {
 					a.hasResource = true;
 					removeResource(res);
-					a.state = "return_with_resource"; // Immediately head back
+					a.state = "return_with_resource";
 				}
 			} else {
-				a.state = "wander"; // No resources found, wander
+				a.state = "wander";
 			}
 			break;
 
 		case "return_with_resource":
 			if (house) {
 				steerSeek(a, house.mesh.position, dt);
-				const distToHouse = a.mesh.position.distanceTo(house.mesh.position);
-				if (distToHouse < 7) {
-					// Drop off distance
+				if (a.mesh.position.distanceTo(house.mesh.position) < 7) {
 					a.hasResource = false;
 					a.hp = Math.min(66, a.hp + RES_HEAL);
-					a.state = "wander"; // Dropped off, now wander
+					a.state = "wander";
 				}
 			} else {
-				a.state = "wander"; // Failsafe
+				a.state = "wander";
 			}
 			break;
 
 		case "return_for_regroup":
 			if (house) {
 				steerSeek(a, house.mesh.position, dt);
-				const distToHouse = a.mesh.position.distanceTo(house.mesh.position);
-				// If we are no longer isolated, or we've reached the base, we can stop.
-				if (!isIsolated || distToHouse < 10) {
+				const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
+				const isIsolated = !closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction;
+				if (!isIsolated || a.mesh.position.distanceTo(house.mesh.position) < 10) {
 					a.state = "wander";
 				}
 			} else {
-				a.state = "wander"; // Failsafe
+				a.state = "wander";
+			}
+			break;
+
+		case "follow_gatherer":
+			if (a.target && a.target.hp > 0) {
+				steerSeek(a, a.target.mesh.position, dt);
+				if (a.mesh.position.distanceTo(a.target.mesh.position) < roleInfo.distances.vue * 0.8) {
+					a.state = "wander";
+					a.target = null;
+				}
+			} else {
+				a.state = "wander";
+				a.target = null;
 			}
 			break;
 	}

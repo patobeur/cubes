@@ -67,7 +67,7 @@ function applyLockToAgent(agent, enabled, snap = true) {
 }
 
 function canSpawnFaction(fid) {
-	return (factionCounts.get(fid) || 0) < 3;
+	return (factionCounts.get(fid) || 0) < 4;
 }
 
 function incFaction(fid) {
