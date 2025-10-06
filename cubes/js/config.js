@@ -138,6 +138,7 @@ export const RES_PICK = 0.7;
 export const RES_HEAL = 20;
 export const INITIAL_RESOURCES = 12;
 export const RESOURCE_SPAWN_RADIUS = 50;
+export const GATHERER_FLEE_DISTANCE = 10;
 
 // Constantes du monde
 export const PLANE_SIZE = 400;

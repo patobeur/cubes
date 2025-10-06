@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { getRoles, getTmpCache, RES_PICK, RES_HEAL } from "./config.js";
+import {
+	getRoles,
+	getTmpCache,
+	RES_PICK,
+	RES_HEAL,
+	GATHERER_FLEE_DISTANCE,
+} from "./config.js";
 import { setVelocity } from "./physics.js";
 import { getAmmo } from "./ammo-lib.js";
 import { getHouses } from "./faction.js";
@@ -130,6 +136,20 @@ function findClosestFactionMember(agent, allAgents) {
 	return [closestMember, closestDist];
 }
 
+function findClosestEnemy(agent, allAgents) {
+	let closestDist = Infinity;
+	let closestEnemy = null;
+	for (const other of allAgents) {
+		if (other.faction === agent.faction) continue;
+		const d = agent.mesh.position.distanceTo(other.mesh.position);
+		if (d < closestDist) {
+			closestDist = d;
+			closestEnemy = other;
+		}
+	}
+	return [closestEnemy, closestDist];
+}
+
 export function updateAgentAI(a, dt, resources, removeResource, agents) {
 	a.grounded = isGrounded(a);
 	if (!a.grounded) return;
@@ -142,25 +162,35 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 
 	// --- Determine Agent State ---
 	if (a.role === "ramasseur") {
-		const maxDist = roleInfo.distances.max_distance_entre_membre_de_meme_faction;
+		const [closestEnemy, enemyDist] = findClosestEnemy(a, agents);
 		const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
-		const isIsolated = !closestAlly || allyDist > maxDist;
+		const isIsolated = !closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction;
 
-		if (isIsolated && a.state !== "return_with_resource") {
+		// Priority 1: Flee from enemies
+		if (closestEnemy && enemyDist < GATHERER_FLEE_DISTANCE) {
+			a.state = "flee";
+		}
+		// Priority 2: Regroup if isolated
+		else if (isIsolated && a.state !== "return_with_resource") {
 			a.state = "return_for_regroup";
-		} else if (a.hasResource) {
+		}
+		// Priority 3: Return resource if carrying one
+		else if (a.hasResource) {
 			a.state = "return_with_resource";
-		} else if (a.hp < 50 && resources.length > 0) {
+		}
+		// Priority 4: Seek resource if available
+		else if (resources.length > 0) {
 			a.state = "seek_resource";
-		} else if (a.state !== "return_for_regroup") {
+		}
+		// Priority 5: Wander if nothing else to do
+		else {
 			a.state = "wander";
 		}
 	} else {
 		// Non-gatherers protect their faction's gatherer.
 		const gatherer = findFactionGatherer(a, agents);
 		if (gatherer) {
-			const distToGatherer = a.mesh.position.distanceTo(gatherer.mesh.position);
-			if (distToGatherer > roleInfo.distances.vue) {
+			if (a.mesh.position.distanceTo(gatherer.mesh.position) > roleInfo.distances.vue) {
 				a.state = "follow_gatherer";
 				a.target = gatherer;
 			} else {
@@ -168,10 +198,8 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			}
 		} else {
 			// No gatherer, fall back to general cohesion.
-			const maxDist = roleInfo.distances.max_distance_entre_membre_de_meme_faction;
 			const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
-			const isIsolated = !closestAlly || allyDist > maxDist;
-			if (isIsolated) {
+			if (!closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction) {
 				a.state = "return_for_regroup";
 			} else {
 				a.state = "wander";
@@ -216,12 +244,33 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			if (house) {
 				steerSeek(a, house.mesh.position, dt);
 				const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
-				const isIsolated = !closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction;
-				if (!isIsolated || a.mesh.position.distanceTo(house.mesh.position) < 10) {
+				if (!closestAlly || allyDist > roleInfo.distances.max_distance_entre_membre_de_meme_faction) {
+					if (a.mesh.position.distanceTo(house.mesh.position) < 10) {
+						a.state = "wander";
+					}
+				} else {
 					a.state = "wander";
 				}
 			} else {
 				a.state = "wander";
+			}
+			break;
+
+		case "flee":
+			const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
+			let retreatTarget = house.mesh.position;
+
+			if (closestAlly) {
+				if (allyDist < a.mesh.position.distanceTo(house.mesh.position)) {
+					retreatTarget = closestAlly.mesh.position;
+				}
+			}
+
+			steerSeek(a, retreatTarget, dt);
+
+			const [enemy, enemyDist] = findClosestEnemy(a, agents);
+			if (!enemy || enemyDist > GATHERER_FLEE_DISTANCE * 1.2) {
+				a.state = "wander"; // Cooldown from fleeing
 			}
 			break;
 
