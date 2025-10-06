@@ -132,12 +132,12 @@ export function getRoles() {
 }
 
 // Constantes pour les ressources
-export const RES_COLOR = 0xff3b30;
-export const RES_R = 0.2;
+export const RES_COLOR = 0x202020;
+export const RES_R = 1;
 export const RES_PICK = 0.7;
 export const RES_HEAL = 20;
-export const INITIAL_RESOURCES = 32;
-export const RESOURCE_SPAWN_RADIUS = 50;
+export const INITIAL_RESOURCES = 52;
+export const RESOURCE_SPAWN_RADIUS = 30;
 export const GATHERER_FLEE_DISTANCE = 10;
 
 // Constantes du monde
