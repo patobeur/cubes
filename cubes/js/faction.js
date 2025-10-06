@@ -45,6 +45,8 @@ export function createHouses() {
 			color: faction.color,
 			metalness: 0.2,
 			roughness: 0.8,
+			transparent: true,
+			opacity: 0.5,
 		});
 		const houseMesh = new THREE.Mesh(houseGeo, houseMat);
 
@@ -54,21 +56,6 @@ export function createHouses() {
 		houseMesh.receiveShadow = true;
 
 		scene.add(houseMesh);
-
-		const shape = new AmmoLib.btBoxShape(
-			new AmmoLib.btVector3(
-				HOUSE_SIZE * 0.5,
-				HOUSE_SIZE * 0.5,
-				HOUSE_SIZE * 0.5
-			)
-		);
-		createRigidBody(
-			houseMesh,
-			shape,
-			0,
-			houseMesh.position,
-			houseMesh.quaternion
-		);
 
 		const house = {
 			id: faction.id,
