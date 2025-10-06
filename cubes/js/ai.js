@@ -356,31 +356,38 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 				(gatherer.state === "seek_resource" ||
 					gatherer.state === "return_with_resource")
 			) {
-				let ultimateTargetPos;
-				// Determine gatherer's ultimate destination
-				if (gatherer.state === "seek_resource" && gatherer.targetResource) {
-					ultimateTargetPos = gatherer.targetResource.pos;
-				} else if (gatherer.state === "return_with_resource") {
-					const gathererHouse = HOUSES.find((h) => h.id === gatherer.faction);
-					if (gathererHouse) {
-						ultimateTargetPos = gathererHouse.mesh.position;
-					}
-				}
-
-				// Default to gatherer's position if no ultimate target is found
-				let finalTarget = ultimateTargetPos || gatherer.mesh.position;
 				const distToGatherer = a.mesh.position.distanceTo(gatherer.mesh.position);
 
-				// If escort strays too far, prioritize regrouping with the gatherer
-				if (distToGatherer > roleInfo.distances.vue) {
-					finalTarget = gatherer.mesh.position;
+				// If escort strays too far, prioritize regrouping directly with the gatherer.
+				if (distToGatherer > roleInfo.distances.vue * 1.2) {
+					steerSeek(a, gatherer.mesh.position, dt);
+					break;
 				}
 
-				// Move towards the final target
-				steerSeek(a, finalTarget, dt);
+				// Calculate a dynamic target position in front of the gatherer.
+				const gathererVel = gatherer.body.getLinearVelocity();
+				const gathererVelVec = new THREE.Vector3(gathererVel.x(), 0, gathererVel.z());
+
+				let formationPos;
+				if (gathererVelVec.lengthSq() > 0.5) {
+					// If gatherer is moving, aim for a spot 4 units in front of it.
+					const leadVec = gathererVelVec.clone().normalize().multiplyScalar(4);
+					formationPos = gatherer.mesh.position.clone().add(leadVec);
+				} else {
+					// If gatherer is stopped, just use its current position.
+					formationPos = gatherer.mesh.position;
+				}
+
+				// Move towards the calculated formation position.
+				// Stop if we get very close to avoid jittering and crowding.
+				if (a.mesh.position.distanceTo(formationPos) > 2.5) {
+					steerSeek(a, formationPos, dt);
+				} else {
+					setVelocity(a.body, 0, 0, 0);
+				}
 
 			} else {
-				// Gatherer is safe, done with its task, or dead
+				// Gatherer is safe, done with its task, or dead.
 				a.state = "wander";
 				a.target = null;
 			}
