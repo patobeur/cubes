@@ -1,0 +1,41 @@
+html,
+body {
+    margin: 0;
+    height: 100%;
+    background: #0b0e13;
+    color: #eaeaea;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu,
+        Cantarell, Noto Sans, sans-serif;
+}
+#app {
+    position: fixed;
+    inset: 0;
+}
+.ui {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    font-size: 14px;
+    line-height: 1.4;
+    max-width: 390px;
+}
+.pass {
+    color: #9f9;
+}
+.fail {
+    color: #f99;
+}
+kbd {
+    background: #504c4c;
+    border: 1px solid #333;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 0 4px;
+}
+a {
+    color: #9ad;
+}
