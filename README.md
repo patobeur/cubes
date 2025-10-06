@@ -1,4 +1,4 @@
 # cubes
 
 cubes
-[test:](/cubes/)
+[test:](/cubes//cubes/)
