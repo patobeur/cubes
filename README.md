@@ -1,2 +1,4 @@
 # cubes
+
 cubes
+[test:](/cubes/)
