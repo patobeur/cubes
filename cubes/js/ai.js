@@ -9,6 +9,9 @@ import {
 import { setVelocity } from "./physics.js";
 import { getAmmo } from "./ammo-lib.js";
 import { getHouses } from "./faction.js";
+import { getScene } from "./scene.js";
+import { setHatColor } from "./agent.js";
+import { checkAndRespawnResources } from "./world.js";
 
 let TMP;
 let HOUSES = [];
@@ -193,13 +196,24 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 		// Non-gatherers protect their faction's gatherer.
 		const gatherer = findFactionGatherer(a, agents);
 		if (gatherer) {
+			// Priority 1: Escort gatherer on mission
 			if (
+				gatherer.state === "seek_resource" ||
+				gatherer.state === "return_with_resource"
+			) {
+				a.state = "escort_gatherer";
+				a.target = gatherer;
+			}
+			// Priority 2: Follow if out of sight
+			else if (
 				a.mesh.position.distanceTo(gatherer.mesh.position) >
 				roleInfo.distances.vue
 			) {
 				a.state = "follow_gatherer";
 				a.target = gatherer;
-			} else {
+			}
+			// Priority 3: Wander if close by and no mission
+			else {
 				a.state = "wander";
 			}
 		} else {
@@ -224,16 +238,30 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			break;
 
 		case "seek_resource":
-			const [res, d] = nearestResource(a.mesh.position, resources);
-			if (res) {
-				steerSeek(a, res.pos, dt);
-				if (d < RES_PICK) {
-					a.hasResource = true;
-					removeResource(res);
-					a.state = "return_with_resource";
+			if (!a.targetResource) {
+				const [res, d] = nearestResource(a.mesh.position, resources);
+				if (res) {
+					a.targetResource = res;
+					setHatColor(a, 0xffff00, 1.5); // Yellow brilliant
+				} else {
+					a.state = "wander";
+					setHatColor(a, 0xffffff, 0); // Reset color
+					break;
 				}
-			} else {
-				a.state = "wander";
+			}
+
+			if (a.targetResource) {
+				steerSeek(a, a.targetResource.pos, dt);
+				const d = a.mesh.position.distanceTo(a.targetResource.pos);
+				if (d < RES_PICK) {
+					a.hasResource = a.targetResource;
+					a.targetResource = null;
+					removeResource(a.hasResource); // Remove from available list
+					a.mesh.add(a.hasResource.mesh); // Attach to agent
+					a.hasResource.mesh.position.set(0, 1.5, 0); // Position above head
+					a.state = "return_with_resource";
+					setHatColor(a, 0xff0000, 1.5); // Red brilliant
+				}
 			}
 			break;
 
@@ -241,12 +269,28 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			if (house) {
 				steerSeek(a, house.mesh.position, dt);
 				if (a.mesh.position.distanceTo(house.mesh.position) < 7) {
-					a.hasResource = false;
-					a.hp = Math.min(66, a.hp + RES_HEAL);
-					a.state = "wander";
+					const scene = getScene();
+					// Detach resource and reparent to the main scene
+					scene.attach(a.hasResource.mesh);
+
+					// Place it randomly near the house
+					const dropOffset = new THREE.Vector3(
+						(Math.random() - 0.5) * 8,
+						0,
+						(Math.random() - 0.5) * 8
+					);
+					const dropPos = house.mesh.position.clone().add(dropOffset);
+					a.hasResource.mesh.position.set(dropPos.x, 0.5, dropPos.z);
+
+					a.hasResource = null;
+					a.state = "seek_resource"; // Immediately seek another
+					setHatColor(a, 0xffffff, 0); // Reset color
+
+					// Check if we need to spawn more resources
+					checkAndRespawnResources();
 				}
 			} else {
-				a.state = "wander";
+				a.state = "wander"; // Should not happen if house exists
 			}
 			break;
 
@@ -299,6 +343,27 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 					a.target = null;
 				}
 			} else {
+				a.state = "wander";
+				a.target = null;
+			}
+			break;
+
+		case "escort_gatherer":
+			if (
+				a.target &&
+				a.target.hp > 0 &&
+				(a.target.state === "seek_resource" ||
+					a.target.state === "return_with_resource")
+			) {
+				const dist = a.mesh.position.distanceTo(a.target.mesh.position);
+				// Keep a safe distance, don't just sit on top of the gatherer
+				if (dist > roleInfo.distances.vue * 0.5) {
+					steerSeek(a, a.target.mesh.position, dt);
+				} else {
+					setVelocity(a.body, 0, 0, 0); // Stop moving if close enough
+				}
+			} else {
+				// Gatherer is safe, done with its task, or dead
 				a.state = "wander";
 				a.target = null;
 			}

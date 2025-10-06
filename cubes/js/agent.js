@@ -98,6 +98,13 @@ function addRoleHat(parentMesh, roleKey) {
 	return hat;
 }
 
+export function setHatColor(agent, color, emissiveIntensity = 0) {
+	if (!agent.hat || !agent.hat.material) return;
+	agent.hat.material.color.set(color);
+	agent.hat.material.emissive.set(color);
+	agent.hat.material.emissiveIntensity = emissiveIntensity;
+}
+
 export function updateHat(agent) {
 	const mesh = agent.mesh;
 	const hat = agent.hat || mesh.children.find((c) => c.name === "roleHat");
@@ -198,7 +205,8 @@ export function spawnAgent(roleKey, factionIndex, x, y, z) {
 		thinkT: 0,
 		turnT: 0,
 		anchor: new THREE.Vector3(x, 0.5, z),
-		hasResource: false,
+		hasResource: null, // Will hold the resource object
+		targetResource: null,
 	};
 	agents.push(agent);
 	incFaction(fac.id);

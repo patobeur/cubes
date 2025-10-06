@@ -44,13 +44,13 @@ export function getResources() {
 export function removeResource(res) {
 	const i = resources.indexOf(res);
 	if (i >= 0) {
-		getScene().remove(res.mesh);
+		// getScene().remove(res.mesh); // Don't remove from scene, just from array
 		resources.splice(i, 1);
-		checkAndRespawnResources();
+		// checkAndRespawnResources(); // Respawn should happen after drop-off
 	}
 }
 
-function checkAndRespawnResources() {
+export function checkAndRespawnResources() {
 	if (resources.length < INITIAL_RESOURCES / 2) {
 		const toSpawn = INITIAL_RESOURCES - resources.length;
 		for (let i = 0; i < toSpawn; i++) {
