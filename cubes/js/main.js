@@ -13,10 +13,10 @@ import {
 	initAgents,
 	spawnAgent,
 	getAgents,
-	updateAgent,
 	faceMotion,
 	updateHat,
 } from "./agent.js";
+import { initAI, updateAgentAI } from "./ai.js";
 import { createWorld, getResources, removeResource } from "./world.js";
 import { FACTIONS, getTmpCache } from "./config.js";
 import { createHouses, getSpawnPointForAgent } from "./faction.js";
@@ -31,6 +31,7 @@ Ammo().then((AmmoLib) => {
 	const { scene, camera, renderer, controls } = initScene();
 	const physicsWorld = initPhysics();
 	initAgents();
+	initAI();
 	createWorld();
 	createHouses();
 
@@ -78,7 +79,7 @@ Ammo().then((AmmoLib) => {
 		const agents = getAgents();
 		const resources = getResources();
 		for (const a of agents) {
-			updateAgent(a, dt, resources, removeResource);
+			updateAgentAI(a, dt, resources, removeResource, agents);
 			faceMotion(a, dt);
 			updateHat(a);
 		}

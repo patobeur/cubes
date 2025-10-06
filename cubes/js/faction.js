@@ -89,10 +89,10 @@ export function createHouses() {
 			.clone()
 			.add(frontVector.multiplyScalar(spawnDistance));
 
-		// 3 spawn points per house (for tank, dps, healer), side by side
-		const agentRoles = ["tank", "dps", "healer"];
+		// 4 spawn points per house, side by side
+		const agentRoles = ["tank", "dps", "healer", "ramasseur"];
 		for (let j = 0; j < agentRoles.length; j++) {
-			const offset = (j - 1) * 2; // agent spacing of 2 units
+			const offset = (j - 1.5) * 2.5; // agent spacing
 			const spawnPoint = spawnCenter
 				.clone()
 				.add(sideVector.clone().multiplyScalar(offset));
