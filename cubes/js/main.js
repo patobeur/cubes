@@ -4,7 +4,8 @@ import { initScene, getScene, getCamera, getRenderer, getControls, clampCameraAb
 import { initPhysics, getPhysicsWorld, getRigidBodies } from './physics.js';
 import { initAgents, spawnAgent, getAgents, updateAgent, faceMotion, updateHat } from './agent.js';
 import { createWorld, getResources, removeResource } from './world.js';
-import { SPAWN_RADIUS, getTmpCache } from './config.js';
+import { FACTIONS, getTmpCache } from './config.js';
+import { createHouses, getSpawnPointForAgent } from './faction.js';
 
 Ammo().then((AmmoLib) => {
     // Stocker l'instance d'Ammo pour un accès global
@@ -17,14 +18,20 @@ Ammo().then((AmmoLib) => {
     const physicsWorld = initPhysics();
     initAgents();
     createWorld();
+    createHouses();
 
     const TMP = getTmpCache();
 
     // Population initiale
-    for (let f = 0; f < 4; f++) {
-        spawnAgent("tank", f, (Math.random() - 0.5) * SPAWN_RADIUS, 7, (Math.random() - 0.5) * SPAWN_RADIUS);
-        spawnAgent("dps", f, (Math.random() - 0.5) * SPAWN_RADIUS, 8, (Math.random() - 0.5) * SPAWN_RADIUS);
-        spawnAgent("healer", f, (Math.random() - 0.5) * SPAWN_RADIUS, 9, (Math.random() - 0.5) * SPAWN_RADIUS);
+    const roles = ['tank', 'dps', 'healer'];
+    for (let i = 0; i < FACTIONS.length; i++) {
+        const faction = FACTIONS[i];
+        for (const role of roles) {
+            const spawnPoint = getSpawnPointForAgent(faction.id, role);
+            if (spawnPoint) {
+                spawnAgent(role, i, spawnPoint.x, spawnPoint.y, spawnPoint.z);
+            }
+        }
     }
 
     // ----------------------
