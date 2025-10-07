@@ -193,31 +193,15 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			a.state = "wander";
 		}
 	} else {
-		// Non-gatherers protect their faction's gatherer.
+		// Non-gatherers' primary role is to protect their faction's gatherer.
 		const gatherer = findFactionGatherer(a, agents);
-		if (gatherer) {
-			// Priority 1: Escort gatherer on mission
-			if (
-				gatherer.state === "seek_resource" ||
-				gatherer.state === "return_with_resource"
-			) {
-				a.state = "escort_gatherer";
-				a.target = gatherer;
-			}
-			// Priority 2: Follow if out of sight
-			else if (
-				a.mesh.position.distanceTo(gatherer.mesh.position) >
-				roleInfo.distances.vue
-			) {
-				a.state = "follow_gatherer";
-				a.target = gatherer;
-			}
-			// Priority 3: Wander if close by and no mission
-			else {
-				a.state = "wander";
-			}
+		if (gatherer && gatherer.hp > 0) {
+			// If a living gatherer exists, escort it. The formation logic
+			// inside the 'escort_gatherer' state will handle distance.
+			a.state = "escort_gatherer";
+			a.target = gatherer;
 		} else {
-			// No gatherer, fall back to general cohesion.
+			// No gatherer, or gatherer is dead. Fall back to general cohesion.
 			const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
 			if (
 				!closestAlly ||
@@ -350,12 +334,7 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 
 		case "escort_gatherer":
 			const gatherer = a.target;
-			if (
-				gatherer &&
-				gatherer.hp > 0 &&
-				(gatherer.state === "seek_resource" ||
-					gatherer.state === "return_with_resource")
-			) {
+			if (gatherer && gatherer.hp > 0) {
 				// 1. Define formation offsets based on the escort's role
 				const formationOffset = new THREE.Vector3();
 				const formationDistance = 4.5;
