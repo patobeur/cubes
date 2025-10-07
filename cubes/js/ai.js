@@ -356,36 +356,44 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 				(gatherer.state === "seek_resource" ||
 					gatherer.state === "return_with_resource")
 			) {
-				const distToGatherer = a.mesh.position.distanceTo(gatherer.mesh.position);
-
-				// If escort strays too far, prioritize regrouping directly with the gatherer.
-				if (distToGatherer > roleInfo.distances.vue * 1.2) {
-					steerSeek(a, gatherer.mesh.position, dt);
-					break;
+				// 1. Define formation offsets based on the escort's role
+				const formationOffset = new THREE.Vector3();
+				const formationDistance = 4.5;
+				switch (a.role) {
+					case "tank":
+						formationOffset.set(0, 0, -formationDistance); // Front
+						break;
+					case "dps":
+						formationOffset.set(-formationDistance, 0, 0); // Left Flank
+						break;
+					case "healer":
+						formationOffset.set(formationDistance, 0, 0); // Right Flank
+						break;
+					default:
+						formationOffset.set(0, 0, formationDistance); // Rear guard
+						break;
 				}
 
-				// Calculate a dynamic target position in front of the gatherer.
-				const gathererVel = gatherer.body.getLinearVelocity();
-				const gathererVelVec = new THREE.Vector3(gathererVel.x(), 0, gathererVel.z());
+				// 2. Get the gatherer's intended direction of travel (heading)
+				const gathererAngle = (gatherer.headingDeg * Math.PI) / 180;
+				const rotation = new THREE.Quaternion().setFromAxisAngle(
+					new THREE.Vector3(0, 1, 0),
+					gathererAngle
+				);
 
-				let formationPos;
-				if (gathererVelVec.lengthSq() > 0.5) {
-					// If gatherer is moving, aim for a spot 4 units in front of it.
-					const leadVec = gathererVelVec.clone().normalize().multiplyScalar(4);
-					formationPos = gatherer.mesh.position.clone().add(leadVec);
-				} else {
-					// If gatherer is stopped, just use its current position.
-					formationPos = gatherer.mesh.position;
-				}
+				// 3. Rotate the role-specific offset to match the gatherer's heading
+				formationOffset.applyQuaternion(rotation);
 
-				// Move towards the calculated formation position.
-				// Stop if we get very close to avoid jittering and crowding.
-				if (a.mesh.position.distanceTo(formationPos) > 2.5) {
+				// 4. Calculate the final target position
+				const formationPos = gatherer.mesh.position.clone().add(formationOffset);
+
+				// 5. Steer towards the calculated formation position
+				const distToTarget = a.mesh.position.distanceTo(formationPos);
+				if (distToTarget > 1.5) { // Threshold to prevent jittering
 					steerSeek(a, formationPos, dt);
 				} else {
-					setVelocity(a.body, 0, 0, 0);
+					setVelocity(a.body, 0, 0, 0); // Stop when in position
 				}
-
 			} else {
 				// Gatherer is safe, done with its task, or dead.
 				a.state = "wander";
