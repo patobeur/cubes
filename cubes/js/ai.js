@@ -253,18 +253,12 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			if (house) {
 				steerSeek(a, house.mesh.position, dt);
 				if (a.mesh.position.distanceTo(house.mesh.position) < 7) {
-					const scene = getScene();
-					// Detach resource and reparent to the main scene
-					scene.attach(a.hasResource.mesh);
+					// Increment stored resources for the faction
+					house.storedResources++;
 
-					// Place it randomly near the house
-					const dropOffset = new THREE.Vector3(
-						(Math.random() - 0.5) * 8,
-						0,
-						(Math.random() - 0.5) * 8
-					);
-					const dropPos = house.mesh.position.clone().add(dropOffset);
-					a.hasResource.mesh.position.set(dropPos.x, 0.5, dropPos.z);
+					// Remove the resource mesh from the scene
+					getScene().remove(a.hasResource.mesh);
+					// Here you might also want to dispose of geometry/material in a larger app
 
 					a.hasResource = null;
 					a.state = "seek_resource"; // Immediately seek another

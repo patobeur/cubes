@@ -19,7 +19,8 @@ import {
 import { initAI, updateAgentAI } from "./ai.js";
 import { createWorld, getResources, removeResource } from "./world.js";
 import { FACTIONS, getTmpCache } from "./config.js";
-import { createHouses, getSpawnPointForAgent } from "./faction.js";
+import { createHouses, getHouses, getSpawnPointForAgent } from "./faction.js";
+import { initUI, updateUI } from "./ui.js";
 
 Ammo().then((AmmoLib) => {
 	// Stocker l'instance d'Ammo pour un accès global
@@ -48,6 +49,8 @@ Ammo().then((AmmoLib) => {
 			}
 		}
 	}
+
+	initUI(getAgents(), getHouses(), FACTIONS);
 
 	// ----------------------
 	// BOUCLE D'ANIMATION
@@ -84,9 +87,10 @@ Ammo().then((AmmoLib) => {
 			updateHat(a);
 		}
 
-		// 4. Rendu
+		// 4. Mise à jour et Rendu
 		controls.update();
 		clampCameraAboveGround();
+		updateUI(now);
 		renderer.render(scene, camera);
 
 		requestAnimationFrame(animate);

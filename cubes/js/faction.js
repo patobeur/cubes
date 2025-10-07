@@ -61,6 +61,7 @@ export function createHouses() {
 			id: faction.id,
 			mesh: houseMesh,
 			spawnPoints: [],
+			storedResources: 0,
 		};
 
 		// Calculate spawn points
