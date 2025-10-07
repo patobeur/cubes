@@ -12,6 +12,7 @@ import { getHouses } from "./faction.js";
 import { getScene } from "./scene.js";
 import { setHatColor } from "./agent.js";
 import { checkAndRespawnResources } from "./world.js";
+import { updateDottedLine, hideDottedLine } from "./effects.js";
 
 let TMP;
 let HOUSES = [];
@@ -144,6 +145,12 @@ function findClosestEnemy(agent, allAgents) {
 	let closestEnemy = null;
 	for (const other of allAgents) {
 		if (other.faction === agent.faction) continue;
+
+		// Gatherers should not consider other gatherers as enemies
+		if (agent.role === 'ramasseur' && other.role === 'ramasseur') {
+			continue;
+		}
+
 		const d = agent.mesh.position.distanceTo(other.mesh.position);
 		if (d < closestDist) {
 			closestDist = d;
@@ -166,42 +173,58 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 	// --- Determine Agent State ---
 	if (a.role === "ramasseur") {
 		const [closestEnemy, enemyDist] = findClosestEnemy(a, agents);
-		const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
 		const isIsolated =
-			!closestAlly ||
-			allyDist >
+			!findClosestFactionMember(a, agents)[0] ||
+			findClosestFactionMember(a, agents)[1] >
 				roleInfo.distances.max_distance_entre_membre_de_meme_faction;
 
 		// Priority 1: Flee from enemies
 		if (closestEnemy && enemyDist < GATHERER_FLEE_DISTANCE) {
+			if (a.collectionTarget) hideDottedLine(a);
+			a.isCollecting = false; // Stop collecting if fleeing
+			a.collectionTarget = null;
 			a.state = "flee";
 		}
-		// Priority 2: Return resource if carrying one
-		else if (a.hasResource) {
+		// Priority 2: Return resource if carrying some and not currently collecting
+		else if (a.carriedResourceAmount > 0 && !a.isCollecting) {
 			a.state = "return_with_resource";
 		}
-		// Priority 3: Seek resource if available
-		else if (resources.length > 0) {
+		// Priority 3: Continue collecting if already doing so
+		else if (a.isCollecting) {
+			a.state = "collect_resource";
+		}
+		// Priority 4: Seek resource if not carrying anything and resources are available
+		else if (a.carriedResourceAmount === 0 && resources.length > 0) {
 			a.state = "seek_resource";
 		}
-		// Priority 4: Regroup if isolated and has nothing else to do
+		// Priority 5: Regroup if isolated and has nothing else to do
 		else if (isIsolated) {
 			a.state = "return_for_regroup";
 		}
-		// Priority 5: Wander if not isolated and nothing else to do
+		// Priority 6: Wander if not isolated and nothing else to do
 		else {
 			a.state = "wander";
 		}
 	} else {
-		// Non-gatherers' primary role is to protect their faction's gatherer.
+		// Non-gatherers reactively protect their faction's gatherer.
 		const gatherer = findFactionGatherer(a, agents);
+		let threatToGatherer = null;
 		if (gatherer && gatherer.hp > 0) {
-			// If a living gatherer exists, escort it. The formation logic
-			// inside the 'escort_gatherer' state will handle distance.
-			a.state = "escort_gatherer";
-			a.target = gatherer;
-		} else {
-			// No gatherer, or gatherer is dead. Fall back to general cohesion.
+			const [threat, threatDistToGatherer] = findClosestEnemy(gatherer, agents);
+			const PROTECTION_RADIUS = 25; // Define a radius around the gatherer
+
+			if (threat && threatDistToGatherer < PROTECTION_RADIUS) {
+				threatToGatherer = threat;
+			}
+		}
+
+		// Priority 1: Intercept threats to the gatherer
+		if (threatToGatherer) {
+			a.state = "intercept_threat";
+			a.target = threatToGatherer;
+		}
+		// Priority 2: Fall back to general cohesion if no threat
+		else {
 			const [closestAlly, allyDist] = findClosestFactionMember(a, agents);
 			if (
 				!closestAlly ||
@@ -222,53 +245,107 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			break;
 
 		case "seek_resource":
-			if (!a.targetResource) {
+			if (!a.collectionTarget) {
 				const [res, d] = nearestResource(a.mesh.position, resources);
 				if (res) {
-					a.targetResource = res;
-					setHatColor(a, 0xffff00, 1.5); // Yellow brilliant
+					a.collectionTarget = res;
 				} else {
 					a.state = "wander";
-					setHatColor(a, 0xffffff, 0); // Reset color
 					break;
 				}
 			}
 
-			if (a.targetResource) {
-				steerSeek(a, a.targetResource.pos, dt);
-				const d = a.mesh.position.distanceTo(a.targetResource.pos);
-				if (d < RES_PICK) {
-					a.hasResource = a.targetResource;
-					a.targetResource = null;
-					removeResource(a.hasResource); // Remove from available list
-					a.mesh.add(a.hasResource.mesh); // Attach to agent
-					a.hasResource.mesh.position.set(0, 1.5, 0); // Position above head
-					a.state = "return_with_resource";
-					setHatColor(a, 0xff0000, 1.5); // Red brilliant
+			if (a.collectionTarget) {
+				if (a.collectionTarget.size <= 0) {
+					hideDottedLine(a);
+					a.collectionTarget = null;
+					a.state = "seek_resource";
+					break;
+				}
+
+				updateDottedLine(a, a.mesh.position, a.collectionTarget.pos);
+				steerSeek(a, a.collectionTarget.pos, dt);
+				const d = a.mesh.position.distanceTo(a.collectionTarget.pos);
+				if (d < RES_PICK + 2.0) {
+					hideDottedLine(a);
+					a.isCollecting = true;
+					a.state = "collect_resource";
 				}
 			}
+			break;
+
+		case "collect_resource":
+			if (!a.collectionTarget || a.collectionTarget.size <= 0) {
+				hideDottedLine(a);
+				a.isCollecting = false;
+				a.collectionTarget = null;
+				a.state = a.carriedResourceAmount > 0 ? "return_with_resource" : "seek_resource";
+				break;
+			}
+
+			// Must be close to the resource to collect
+			if (a.mesh.position.distanceTo(a.collectionTarget.pos) > RES_PICK + 2.5) {
+				// Too far, stop collecting and go back to seeking it
+				a.isCollecting = false;
+				a.state = "seek_resource";
+				break;
+			}
+
+			setVelocity(a.body, 0, 0, 0);
+			const dir = new THREE.Vector3().subVectors(a.collectionTarget.pos, a.mesh.position);
+			a.headingDeg = (Math.atan2(dir.x, dir.z) * 180) / Math.PI;
+
+			const collectionRate = 10; // 10 units per second
+			const amountToCollect = collectionRate * dt;
+			const actualCollected = Math.min(amountToCollect, a.collectionTarget.size);
+
+			a.carriedResourceAmount += actualCollected;
+			a.collectionTarget.size -= actualCollected;
+
+			// Update visuals
+			const sourceScale = Math.max(0.01, a.collectionTarget.size / 100.0);
+			a.collectionTarget.mesh.scale.set(sourceScale, sourceScale, sourceScale);
+
+			a.carriedResourceMesh.material.visible = true;
+			const carriedScale = 0.1 + (a.carriedResourceAmount / 100.0) * 1.2;
+			a.carriedResourceMesh.scale.set(carriedScale, carriedScale, carriedScale);
+
+			if (a.collectionTarget.size <= 0) {
+				getScene().remove(a.collectionTarget.mesh);
+				removeResource(a.collectionTarget);
+				a.isCollecting = false;
+				a.collectionTarget = null;
+				a.state = "return_with_resource";
+			}
+
+			// Agent decides to return home if it has collected a decent amount
+			if (a.carriedResourceAmount >= 100) {
+				 a.isCollecting = false;
+				 a.state = "return_with_resource";
+			}
+
 			break;
 
 		case "return_with_resource":
 			if (house) {
 				steerSeek(a, house.mesh.position, dt);
 				if (a.mesh.position.distanceTo(house.mesh.position) < 7) {
-					// Increment stored resources for the faction
-					house.storedResources++;
+					// This fixes the resource drop-off bug
+					house.storedResources += a.carriedResourceAmount;
 
-					// Remove the resource mesh from the scene
-					getScene().remove(a.hasResource.mesh);
-					// Here you might also want to dispose of geometry/material in a larger app
+					a.carriedResourceAmount = 0;
 
-					a.hasResource = null;
-					a.state = "seek_resource"; // Immediately seek another
-					setHatColor(a, 0xffffff, 0); // Reset color
+					// Hide and reset the carried resource mesh
+					a.carriedResourceMesh.material.visible = false;
+					a.carriedResourceMesh.scale.set(0.1, 0.1, 0.1);
+
+					a.state = "seek_resource";
 
 					// Check if we need to spawn more resources
 					checkAndRespawnResources();
 				}
 			} else {
-				a.state = "wander"; // Should not happen if house exists
+				a.state = "wander";
 			}
 			break;
 
@@ -310,65 +387,13 @@ export function updateAgentAI(a, dt, resources, removeResource, agents) {
 			}
 			break;
 
-		case "follow_gatherer":
+		case "intercept_threat":
 			if (a.target && a.target.hp > 0) {
 				steerSeek(a, a.target.mesh.position, dt);
-				if (
-					a.mesh.position.distanceTo(a.target.mesh.position) <
-					roleInfo.distances.vue * 0.8
-				) {
-					a.state = "wander";
-					a.target = null;
-				}
+				// (A more advanced implementation would have combat logic here)
+				// For now, they just move towards the threat.
+				// If the threat is dead or moves away, the state will change on the next tick.
 			} else {
-				a.state = "wander";
-				a.target = null;
-			}
-			break;
-
-		case "escort_gatherer":
-			const gatherer = a.target;
-			if (gatherer && gatherer.hp > 0) {
-				// 1. Define formation offsets based on the escort's role
-				const formationOffset = new THREE.Vector3();
-				const formationDistance = 4.5;
-				switch (a.role) {
-					case "tank":
-						formationOffset.set(0, 0, -formationDistance); // Front
-						break;
-					case "dps":
-						formationOffset.set(-formationDistance, 0, 0); // Left Flank
-						break;
-					case "healer":
-						formationOffset.set(formationDistance, 0, 0); // Right Flank
-						break;
-					default:
-						formationOffset.set(0, 0, formationDistance); // Rear guard
-						break;
-				}
-
-				// 2. Get the gatherer's intended direction of travel (heading)
-				const gathererAngle = (gatherer.headingDeg * Math.PI) / 180;
-				const rotation = new THREE.Quaternion().setFromAxisAngle(
-					new THREE.Vector3(0, 1, 0),
-					gathererAngle
-				);
-
-				// 3. Rotate the role-specific offset to match the gatherer's heading
-				formationOffset.applyQuaternion(rotation);
-
-				// 4. Calculate the final target position
-				const formationPos = gatherer.mesh.position.clone().add(formationOffset);
-
-				// 5. Steer towards the calculated formation position
-				const distToTarget = a.mesh.position.distanceTo(formationPos);
-				if (distToTarget > 1.5) { // Threshold to prevent jittering
-					steerSeek(a, formationPos, dt);
-				} else {
-					setVelocity(a.body, 0, 0, 0); // Stop when in position
-				}
-			} else {
-				// Gatherer is safe, done with its task, or dead.
 				a.state = "wander";
 				a.target = null;
 			}

@@ -21,6 +21,7 @@ import { createWorld, getResources, removeResource } from "./world.js";
 import { FACTIONS, getTmpCache } from "./config.js";
 import { createHouses, getHouses, getSpawnPointForAgent } from "./faction.js";
 import { initUI, updateUI } from "./ui.js";
+import { initEffects } from "./effects.js";
 
 Ammo().then((AmmoLib) => {
 	// Stocker l'instance d'Ammo pour un accès global
@@ -35,6 +36,7 @@ Ammo().then((AmmoLib) => {
 	initAI();
 	createWorld();
 	createHouses();
+	initEffects();
 
 	const TMP = getTmpCache();
 

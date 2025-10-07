@@ -74,6 +74,6 @@ function spawnResource(x, z) {
 	const m = new THREE.Mesh(geo, mat);
 	m.position.set(x, y, z);
 	getScene().add(m);
-	resources.push({ mesh: m, pos: m.position.clone() });
+	resources.push({ mesh: m, pos: m.position.clone(), size: 100 }); // Add size property
 	return m;
 }

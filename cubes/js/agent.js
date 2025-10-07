@@ -171,6 +171,18 @@ export function spawnAgent(roleKey, factionIndex, x, y, z) {
 	getScene().add(mesh);
 
 	const hat = addRoleHat(mesh, roleKey);
+
+	// Create the mesh for visually representing carried resources
+	const carriedResourceGeo = new THREE.SphereGeometry(0.1, 12, 8); // Starts small
+	const carriedResourceMat = new THREE.MeshStandardMaterial({
+		color: 0xffff00,
+		emissive: 0x333300,
+		visible: false, // Initially hidden
+	});
+	const carriedResourceMesh = new THREE.Mesh(carriedResourceGeo, carriedResourceMat);
+	carriedResourceMesh.position.set(0, 1.5, 0); // Position above agent's head
+	mesh.add(carriedResourceMesh);
+
 	const shape = role.makeShape();
 	const body = createRigidBody(
 		mesh,
@@ -193,6 +205,7 @@ export function spawnAgent(roleKey, factionIndex, x, y, z) {
 		mesh,
 		body,
 		hat,
+		carriedResourceMesh,
 		faction: fac.id,
 		role: roleKey,
 		headingDeg: Math.random() * 360,
@@ -205,8 +218,9 @@ export function spawnAgent(roleKey, factionIndex, x, y, z) {
 		thinkT: 0,
 		turnT: 0,
 		anchor: new THREE.Vector3(x, 0.5, z),
-		hasResource: null, // Will hold the resource object
-		targetResource: null,
+		isCollecting: false,
+		collectionTarget: null,
+		carriedResourceAmount: 0,
 	};
 	agents.push(agent);
 	incFaction(fac.id);
